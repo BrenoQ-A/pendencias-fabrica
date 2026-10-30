@@ -1,0 +1,34 @@
+services:
+  app:
+    build: .
+    container_name: pendencias-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=file:/data/custom.db
+    volumes:
+      - pendencias-data:/data
+
+  # ---------- HTTPS automático (opcional, recomendado) ----------
+  # Descomente após apontar o DNS do domínio para o servidor
+  # e criar o arquivo Caddyfile ao lado deste compose.
+  #
+  # caddy:
+  #   image: caddy:2-alpine
+  #   container_name: pendencias-caddy
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - app
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./Caddyfile.prod:/etc/caddy/Caddyfile:ro
+  #     - caddy-data:/data
+  #     - caddy-config:/config
+
+volumes:
+  pendencias-data:
+  # caddy-data:
+  # caddy-config:

@@ -1,0 +1,56 @@
+// Pendências da Fábrica — schema do app
+// Status canônico: "Pendente" | "Em andamento" | "Concluído"
+// "Atrasada" é derivado: dataLimite < hoje && status != "Concluído"
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"] // permite usar Turso (libSQL) via adapter
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Pendencia {
+  id            String          @id @default(cuid())
+  numero        Int             @unique // nº sequencial (ID do Forms)
+  titulo        String // "Problema encontrado"
+  detalhe       String? // "Detalhamento (opcional)"
+  local         String // "Onde o problema foi identificado?"
+  solucao       String? // "Solução necessária"
+  acao          String? // "Ação - Facilities"
+  responsavel   String // "Responsável - Execução"
+  prioridade    String          @default("Moderado") // Crítico | Alto | Moderado | Baixo
+  status        String          @default("Pendente")
+  dataRegistro  DateTime        @default(now())
+  dataLimite    DateTime?
+  resolvidoEm   DateTime?
+  nota          String? // Nota / OS
+  registradoPor String? // nome de quem registrou
+  origem        String          @default("App") // App | Planilha
+  fotos         Foto[]
+  historico     HistoricoItem[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+model Foto {
+  id          String    @id @default(cuid())
+  pendenciaId String
+  pendencia   Pendencia @relation(fields: [pendenciaId], references: [id], onDelete: Cascade)
+  dataUrl     String // JPEG comprimido (máx. 1280px) — carregado só na galeria/lightbox
+  thumbUrl    String // JPEG pequeno (máx. 320px) — listas e grades
+  nome        String?
+  criadoEm    DateTime  @default(now())
+}
+
+model HistoricoItem {
+  id          String    @id @default(cuid())
+  pendenciaId String
+  pendencia   Pendencia @relation(fields: [pendenciaId], references: [id], onDelete: Cascade)
+  status      String
+  comentario  String?
+  autor       String?
+  criadoEm    DateTime  @default(now())
+}
