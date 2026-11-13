@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { exigirEditor } from '@/lib/autorizacao'
 
 type Params = { params: Promise<{ id: string }> }
 
 const VALIDOS = ['Pendente', 'Em andamento', 'Concluído']
 
-// POST /api/pendencias/[id]/status — muda status e registra no histórico
+// POST /api/pendencias/[id]/status — muda status e registra no histórico (só ADMIN)
 export async function POST(req: NextRequest, { params }: Params) {
+  const bloqueio = await exigirEditor()
+  if (bloqueio) return bloqueio
   try {
     const { id } = await params
     const body = await req.json()

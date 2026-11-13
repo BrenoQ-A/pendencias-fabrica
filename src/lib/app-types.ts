@@ -35,6 +35,9 @@ export interface Pendencia {
   dataLimite?: string | null
   resolvidoEm?: string | null
   nota?: string | null
+  ordem?: string | null
+  localInstalacao?: string | null
+  notaOriginal?: string | null
   registradoPor?: string | null
   origem: string
   fotos: FotoItem[]
@@ -60,6 +63,8 @@ export interface PendenciaInput {
   dataRegistro?: string
   dataLimite?: string | null
   nota?: string
+  ordem?: string
+  localInstalacao?: string
   registradoPor?: string
   fotos?: NovaFotoPayload[]
 }

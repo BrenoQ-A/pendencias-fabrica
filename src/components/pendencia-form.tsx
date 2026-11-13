@@ -64,6 +64,8 @@ export function PendenciaForm({ aberto, editando, locaisExistentes, responsaveis
   const [dataRegistro, setDataRegistro] = useState(hojeISO())
   const [dataLimite, setDataLimite] = useState('')
   const [nota, setNota] = useState('')
+  const [ordem, setOrdem] = useState('')
+  const [localInstalacao, setLocalInstalacao] = useState('')
   const [fotosNovas, setFotosNovas] = useState<FotoComprimida[]>([])
   const [fotosExistentes, setFotosExistentes] = useState<FotoExistente[]>([])
   const [processando, setProcessando] = useState(false)
@@ -83,6 +85,8 @@ export function PendenciaForm({ aberto, editando, locaisExistentes, responsaveis
       setDataRegistro(editando.dataRegistro.slice(0, 10))
       setDataLimite(editando.dataLimite ? editando.dataLimite.slice(0, 10) : '')
       setNota(editando.nota ?? '')
+      setOrdem(editando.ordem ?? '')
+      setLocalInstalacao(editando.localInstalacao ?? '')
       setFotosExistentes(editando.fotos.map((f) => ({ id: f.id, thumbUrl: f.thumbUrl })))
       setFotosNovas([])
     } else {
@@ -97,6 +101,8 @@ export function PendenciaForm({ aberto, editando, locaisExistentes, responsaveis
       setDataRegistro(hojeISO())
       setDataLimite('')
       setNota('')
+      setOrdem('')
+      setLocalInstalacao('')
       setFotosExistentes([])
       setFotosNovas([])
     }
@@ -146,6 +152,8 @@ export function PendenciaForm({ aberto, editando, locaisExistentes, responsaveis
           dataRegistro,
           dataLimite: dataLimite || null,
           nota: nota.trim(),
+          ordem: ordem.trim(),
+          localInstalacao: localInstalacao.trim(),
           registradoPor: editando?.registradoPor ?? 'App',
           fotos: editando ? novas : novas,
         },
@@ -289,9 +297,25 @@ export function PendenciaForm({ aberto, editando, locaisExistentes, responsaveis
             </div>
           </div>
 
+          {/* Nota / Ordem / Local de instalação — separados para a importação do SAP */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label htmlFor="f-nota">Nota</Label>
+              <Input id="f-nota" value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Nº da nota (opcional)" />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="f-ordem">Ordem (OS)</Label>
+              <Input id="f-ordem" value={ordem} onChange={(e) => setOrdem(e.target.value)} placeholder="Nº da OS (opcional)" />
+            </div>
+          </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="f-nota">Nota / OS</Label>
-            <Input id="f-nota" value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Nº da ordem de serviço (opcional)" />
+            <Label htmlFor="f-localInst">Local de instalação</Label>
+            <Input
+              id="f-localInst"
+              value={localInstalacao}
+              onChange={(e) => setLocalInstalacao(e.target.value)}
+              placeholder="Onde a nota/OS foi instalada (opcional)"
+            />
           </div>
 
           {/* Fotos */}

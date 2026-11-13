@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { exigirEditor } from '@/lib/autorizacao'
+import { proximoNumero } from '@/lib/contador'
 
 // GET /api/pendencias — lista completa (fotos só com thumb, sem dataUrl pesado)
 export async function GET() {
@@ -20,6 +22,8 @@ export async function GET() {
       dataLimite: true,
       resolvidoEm: true,
       nota: true,
+      ordem: true,
+      localInstalacao: true,
       registradoPor: true,
       origem: true,
       createdAt: true,
@@ -31,8 +35,10 @@ export async function GET() {
   return NextResponse.json(itens)
 }
 
-// POST /api/pendencias — cria pendência (fotos já comprimidas no cliente)
+// POST /api/pendencias — cria pendência (só ADMIN; fotos já comprimidas no cliente)
 export async function POST(req: NextRequest) {
+  const bloqueio = await exigirEditor()
+  if (bloqueio) return bloqueio
   try {
     const body = await req.json()
     const titulo = String(body.titulo ?? '').trim()
@@ -42,8 +48,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ erro: 'Problema, local e responsável são obrigatórios.' }, { status: 400 })
     }
 
-    const maior = await db.pendencia.aggregate({ _max: { numero: true } })
-    const numero = (maior._max.numero ?? 0) + 1
+    // Contador atômico: não colide quando dois registros chegam juntos
+    const numero = await proximoNumero()
 
     const fotos: { dataUrl: string; thumbUrl: string; nome?: string }[] = Array.isArray(body.fotos)
       ? body.fotos.filter((f: { dataUrl?: string; thumbUrl?: string }) => f?.dataUrl && f?.thumbUrl)
@@ -64,7 +70,9 @@ export async function POST(req: NextRequest) {
           ? new Date(`${String(body.dataRegistro).slice(0, 10)}T12:00:00.000Z`)
           : new Date(),
         dataLimite: body.dataLimite ? new Date(`${String(body.dataLimite).slice(0, 10)}T12:00:00.000Z`) : null,
-        nota: body.nota ? String(body.nota) : null,
+        nota: body.nota ? String(body.nota).trim() : null,
+        ordem: body.ordem ? String(body.ordem).trim() : null,
+        localInstalacao: body.localInstalacao ? String(body.localInstalacao).trim() : null,
         registradoPor: body.registradoPor ? String(body.registradoPor) : 'App',
         origem: 'App',
         fotos: { create: fotos.map((f) => ({ dataUrl: f.dataUrl, thumbUrl: f.thumbUrl, nome: f.nome ?? null })) },

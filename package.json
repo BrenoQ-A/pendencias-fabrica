@@ -8,10 +8,13 @@
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
     "postinstall": "prisma generate",
-    "db:push": "prisma db push --accept-data-loss",
+    "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:reset": "prisma migrate reset"
+    "db:reset": "prisma migrate reset",
+    "db:aplicar": "bun scripts/aplicar_schema_turso.ts prisma/migrations/20261113150000_etapa1_usuarios_nota_contador/migration.sql",
+    "usuario:criar": "bun scripts/criar-usuario.mjs",
+    "nota:backfill": "bun scripts/backfill-nota.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

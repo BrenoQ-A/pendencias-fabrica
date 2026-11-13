@@ -32,6 +32,7 @@ export default function Pagina() {
   const [trocandoId, setTrocandoId] = useState<string | null>(null)
   const [lightboxGaleria, setLightboxGaleria] = useState<{ fotos: { id: string; thumbUrl: string; nome?: string | null }[]; indice: number; legenda: string } | null>(null)
   const [usuarioLogado, setUsuarioLogado] = useState<string | null>(null)
+  const [podeEditar, setPodeEditar] = useState(false)
 
   const carregar = useCallback(async () => {
     try {
@@ -54,7 +55,10 @@ export default function Pagina() {
     carregar()
     fetch('/api/auth/session')
       .then((r) => r.json())
-      .then((s) => setUsuarioLogado(s?.usuario ?? null))
+      .then((s) => {
+        setUsuarioLogado(s?.nome ?? s?.usuario ?? null)
+        setPodeEditar(s?.papel === 'ADMIN')
+      })
       .catch(() => {})
   }, [carregar])
 
@@ -173,6 +177,7 @@ export default function Pagina() {
           {usuarioLogado && (
             <span className="hidden shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground lg:inline">
               {usuarioLogado}
+              {!podeEditar && ' · só leitura'}
             </span>
           )}
           <Button
@@ -195,16 +200,18 @@ export default function Pagina() {
             <Download className="h-4 w-4" />
             <span className="hidden md:inline">Exportar CSV</span>
           </Button>
-          <Button
-            size="sm"
-            className="hidden h-9 shrink-0 gap-1.5 bg-orange-600 text-white hover:bg-orange-700 sm:flex"
-            onClick={() => {
-              setEditando(null)
-              setFormAberto(true)
-            }}
-          >
-            <Plus className="h-4 w-4" /> Nova pendência
-          </Button>
+          {podeEditar && (
+            <Button
+              size="sm"
+              className="hidden h-9 shrink-0 gap-1.5 bg-orange-600 text-white hover:bg-orange-700 sm:flex"
+              onClick={() => {
+                setEditando(null)
+                setFormAberto(true)
+              }}
+            >
+              <Plus className="h-4 w-4" /> Nova pendência
+            </Button>
+          )}
         </div>
       </header>
 
@@ -269,7 +276,13 @@ export default function Pagina() {
               )}
 
               {aba === 'kanban' && (
-                <KanbanBoard itens={filtrados} aoAbrir={setDetail} aoMudarStatus={mudarStatus} trocandoId={trocandoId} />
+                <KanbanBoard
+                  itens={filtrados}
+                  aoAbrir={setDetail}
+                  aoMudarStatus={mudarStatus}
+                  trocandoId={trocandoId}
+                  podeEditar={podeEditar}
+                />
               )}
 
               {aba === 'fotos' && (
@@ -284,17 +297,19 @@ export default function Pagina() {
       </main>
 
       {/* ===== FAB (celular) ===== */}
-      <button
-        type="button"
-        onClick={() => {
-          setEditando(null)
-          setFormAberto(true)
-        }}
-        className="fixed bottom-5 right-4 z-30 flex h-14 items-center gap-2 rounded-full bg-orange-600 px-5 text-sm font-bold text-white shadow-lg shadow-orange-600/30 transition hover:bg-orange-700 active:scale-95 sm:hidden"
-        aria-label="Nova pendência"
-      >
-        <Plus className="h-5 w-5" /> Registrar
-      </button>
+      {podeEditar && (
+        <button
+          type="button"
+          onClick={() => {
+            setEditando(null)
+            setFormAberto(true)
+          }}
+          className="fixed bottom-5 right-4 z-30 flex h-14 items-center gap-2 rounded-full bg-orange-600 px-5 text-sm font-bold text-white shadow-lg shadow-orange-600/30 transition hover:bg-orange-700 active:scale-95 sm:hidden"
+          aria-label="Nova pendência"
+        >
+          <Plus className="h-5 w-5" /> Registrar
+        </button>
+      )}
 
       {/* ===== Rodapé ===== */}
       <footer className="mt-auto border-t bg-background">
@@ -314,6 +329,7 @@ export default function Pagina() {
       {/* ===== Overlays ===== */}
       <PendenciaDetail
         pendencia={detail}
+        podeEditar={podeEditar}
         aoFechar={() => setDetail(null)}
         aoMudarStatus={mudarStatus}
         aoEditar={abrirEdicao}

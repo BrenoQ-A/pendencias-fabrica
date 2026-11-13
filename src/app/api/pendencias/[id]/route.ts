@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { exigirEditor } from '@/lib/autorizacao'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -17,8 +18,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
   return NextResponse.json(item)
 }
 
-// PATCH /api/pendencias/[id] — edita campos; fotos novas entram como { dataUrl, thumbUrl }
+// PATCH /api/pendencias/[id] — edita campos (só ADMIN); fotos novas entram como { dataUrl, thumbUrl }
 export async function PATCH(req: NextRequest, { params }: Params) {
+  const bloqueio = await exigirEditor()
+  if (bloqueio) return bloqueio
   try {
     const { id } = await params
     const body = await req.json()
@@ -34,7 +37,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (body.acao !== undefined) data.acao = body.acao ? String(body.acao) : null
     if (body.responsavel !== undefined) data.responsavel = String(body.responsavel).trim()
     if (body.prioridade !== undefined) data.prioridade = String(body.prioridade)
-    if (body.nota !== undefined) data.nota = body.nota ? String(body.nota) : null
+    if (body.nota !== undefined) data.nota = body.nota ? String(body.nota).trim() : null
+    if (body.ordem !== undefined) data.ordem = body.ordem ? String(body.ordem).trim() : null
+    if (body.localInstalacao !== undefined)
+      data.localInstalacao = body.localInstalacao ? String(body.localInstalacao).trim() : null
     if (body.registradoPor !== undefined) data.registradoPor = body.registradoPor ? String(body.registradoPor) : null
     if (body.dataRegistro !== undefined)
       data.dataRegistro = new Date(`${String(body.dataRegistro).slice(0, 10)}T12:00:00.000Z`)
@@ -72,8 +78,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 }
 
-// DELETE /api/pendencias/[id]
+// DELETE /api/pendencias/[id] — só ADMIN
 export async function DELETE(_req: NextRequest, { params }: Params) {
+  const bloqueio = await exigirEditor()
+  if (bloqueio) return bloqueio
   const { id } = await params
   await db.pendencia.delete({ where: { id } })
   return NextResponse.json({ ok: true })

@@ -1,16 +1,30 @@
 // Autenticação do app Pendências da Fábrica
 //
-// Acesso único (ideal para equipe pequena) definido por variáveis de ambiente:
-//   APP_USUARIO  — nome de usuário (padrão: admin)
-//   APP_SENHA    — senha de acesso (padrão: fabrica2026 — TROQUE em produção)
-//   AUTH_SECRET  — segredo que assina o cookie de sessão (defina um valor
-//                  aleatório em produção; se vazio, usa um padrão fixo)
+// Usuários ficam na tabela "Usuario" do banco, com papel:
+//   ADMIN       — edita (criar, editar, excluir, mudar status)
+//   SUPERVISOR  — só vê
+// Cada usuário tem login e senha com hash PBKDF2-SHA256 (Web Crypto). Crie
+// usuários com: bun scripts/criar-usuario.mjs --login ... --senha ... --papel ...
 //
-// A sessão é um cookie HttpOnly assinado com HMAC-SHA256 (payload com usuário
-// e expiração). Usa apenas Web Crypto, funcionando no middleware (edge) e nas
-// rotas de API (Node).
+// Fallback de emergência: enquanto a tabela "Usuario" estiver vazia (ex.:
+// migration pendente ou banco novo), vale o par APP_USUARIO/APP_SENHA do
+// .env como ADMIN. Com qualquer usuário cadastrado, o fallback desliga.
+//
+// A sessão é um cookie HttpOnly assinado com HMAC-SHA256 (payload com login,
+// nome, papel e expiração). Usa apenas Web Crypto, funcionando no proxy
+// (Node, no Next 16) e nas rotas de API.
+
+import { db } from '@/lib/db'
 
 export const COOKIE_SESSAO = 'pendencias_sessao'
+
+export type Papel = 'ADMIN' | 'SUPERVISOR'
+
+export interface Sessao {
+  login: string
+  nome: string
+  papel: Papel
+}
 
 const DURACAO_PADRAO_MS = 7 * 24 * 60 * 60 * 1000 // 7 dias
 
@@ -25,7 +39,7 @@ export function obterSegredo(): string {
   const explicito = (process.env.AUTH_SECRET ?? '').trim()
   if (explicito) return explicito
   // Padrão fixo (nunca derivado de valores que possam mudar em tempo de
-  // execução): garante que middleware e rotas usem sempre o mesmo segredo.
+  // execução): garante que proxy e rotas usem sempre o mesmo segredo.
   return 'pendencias-fabrica|segredo-padrao|troque-o-com-AUTH_SECRET'
 }
 
@@ -34,7 +48,7 @@ export function duracaoSessaoMs(): number {
   return Number.isFinite(dias) && dias > 0 ? dias * 24 * 60 * 60 * 1000 : DURACAO_PADRAO_MS
 }
 
-// ===== Utilitários base64url (btoa/atob existem no edge e no Node 18+) =====
+// ===== Utilitários base64url e hex (btoa/atob existem no edge e no Node 18+) =====
 
 function bytesParaBase64url(bytes: Uint8Array): string {
   let bin = ''
@@ -50,6 +64,18 @@ function base64urlParaBytes(texto: string): Uint8Array {
   return bytes
 }
 
+function bytesParaHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+function hexParaBytes(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2)
+  for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16)
+  return bytes
+}
+
 // ===== Comparação em tempo constante (evita ataques de temporização) =====
 
 function comparacaoSegura(a: string, b: string): boolean {
@@ -59,14 +85,49 @@ function comparacaoSegura(a: string, b: string): boolean {
   return dif === 0
 }
 
-async function resumoHex(texto: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(texto))
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
+// ===== Hash de senha (PBKDF2-SHA256, só Web Crypto) =====
+// Formato no banco: "pbkdf2$<iterações>$<sal hex>$<chave hex>" — auto-descritivo,
+// então aumentar as iterações no futuro não quebra hashes antigos.
+
+export const PBKDF2_ITERACOES = 600_000
+
+async function derivarBits(senha: string, sal: Uint8Array, iteracoes: number): Promise<Uint8Array> {
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(senha), 'PBKDF2', false, [
+    'deriveBits',
+  ])
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', hash: 'SHA-256', salt: sal as unknown as BufferSource, iterations: iteracoes },
+    base,
+    256,
+  )
+  return new Uint8Array(bits)
 }
 
-export async function verificarCredenciais(usuario?: string, senha?: string): Promise<boolean> {
+export async function criarHashSenha(senha: string): Promise<string> {
+  const sal = crypto.getRandomValues(new Uint8Array(16))
+  const chave = await derivarBits(senha, sal, PBKDF2_ITERACOES)
+  return `pbkdf2$${PBKDF2_ITERACOES}$${bytesParaHex(sal)}$${bytesParaHex(chave)}`
+}
+
+export async function conferirHash(senha: string, armazenado: string): Promise<boolean> {
+  const partes = armazenado.split('$')
+  if (partes.length !== 4 || partes[0] !== 'pbkdf2') return false
+  const iteracoes = Number(partes[1])
+  if (!Number.isFinite(iteracoes) || iteracoes < 1 || iteracoes > 10_000_000) return false
+  const sal = hexParaBytes(partes[2])
+  if (sal.length === 0) return false
+  const calculada = await derivarBits(senha, sal, iteracoes)
+  return comparacaoSegura(bytesParaHex(calculada), partes[3])
+}
+
+// ===== Fallback do .env (mesma comparação de antes, via resumo SHA-256) =====
+
+async function resumoHex(texto: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(texto))
+  return bytesParaHex(new Uint8Array(digest))
+}
+
+async function verificarCredenciaisEnv(usuario?: string, senha?: string): Promise<boolean> {
   const cred = obterCredenciais()
   const [resumoUInfo, resumoUCred] = await Promise.all([
     resumoHex((usuario ?? '').trim().toLowerCase()),
@@ -74,6 +135,42 @@ export async function verificarCredenciais(usuario?: string, senha?: string): Pr
   ])
   const [resumoSInfo, resumoSCred] = await Promise.all([resumoHex(senha ?? ''), resumoHex(cred.senha)])
   return comparacaoSegura(resumoUInfo, resumoUCred) && comparacaoSegura(resumoSInfo, resumoSCred)
+}
+
+// ===== Login: banco primeiro, fallback do .env só com a tabela vazia =====
+
+async function totalUsuarios(): Promise<number> {
+  try {
+    return await db.usuario.count()
+  } catch {
+    return 0 // tabela ainda não existe (migration pendente) → fallback liberado
+  }
+}
+
+export async function autenticar(login?: string, senha?: string): Promise<Sessao | null> {
+  const loginNorm = (login ?? '').trim().toLowerCase()
+  const senhaStr = String(senha ?? '')
+  if (!loginNorm || !senhaStr) return null
+
+  try {
+    const usuario = await db.usuario.findUnique({ where: { login: loginNorm } })
+    if (usuario) {
+      if (!(await conferirHash(senhaStr, usuario.senhaHash))) return null
+      return {
+        login: usuario.login,
+        nome: usuario.nome?.trim() || usuario.login,
+        papel: usuario.papel === 'ADMIN' ? 'ADMIN' : 'SUPERVISOR',
+      }
+    }
+  } catch (e) {
+    console.warn('autenticar: tabela Usuario indisponível (migration pendente?)', e instanceof Error ? e.message : e)
+  }
+
+  // Nenhum usuário com esse login: se já existem usuários cadastrados, nega;
+  // se a tabela está vazia, vale o par de emergência do .env (como ADMIN).
+  if ((await totalUsuarios()) > 0) return null
+  if (!(await verificarCredenciaisEnv(loginNorm, senhaStr))) return null
+  return { login: loginNorm, nome: loginNorm, papel: 'ADMIN' }
 }
 
 // ===== Token de sessão: <payload base64url>.<hmac base64url> =====
@@ -88,14 +185,14 @@ async function chaveHmac(): Promise<CryptoKey> {
   )
 }
 
-export async function criarTokenSessao(usuario: string): Promise<string> {
-  const payload = { u: usuario, exp: Date.now() + duracaoSessaoMs() }
+export async function criarTokenSessao(sessao: Sessao): Promise<string> {
+  const payload = { u: sessao.login, n: sessao.nome, p: sessao.papel, exp: Date.now() + duracaoSessaoMs() }
   const corpo = bytesParaBase64url(new TextEncoder().encode(JSON.stringify(payload)))
   const assinatura = await crypto.subtle.sign('HMAC', await chaveHmac(), new TextEncoder().encode(corpo))
   return `${corpo}.${bytesParaBase64url(new Uint8Array(assinatura))}`
 }
 
-export async function verificarTokenSessao(token: string | undefined | null): Promise<{ usuario: string } | null> {
+export async function verificarTokenSessao(token: string | undefined | null): Promise<Sessao | null> {
   if (!token) return null
   const sep = token.lastIndexOf('.')
   if (sep <= 0) return null
@@ -108,11 +205,20 @@ export async function verificarTokenSessao(token: string | undefined | null): Pr
 
     const payload = JSON.parse(new TextDecoder().decode(base64urlParaBytes(corpo))) as {
       u?: unknown
+      n?: unknown
+      p?: unknown
       exp?: unknown
     }
     if (typeof payload.u !== 'string' || typeof payload.exp !== 'number') return null
     if (payload.exp < Date.now()) return null
-    return { usuario: payload.u }
+    // Cookies da versão anterior (sem papel) são rejeitados: força re-login
+    // depois do deploy — as sessões antigas não recebem papel por engano.
+    if (payload.p !== 'ADMIN' && payload.p !== 'SUPERVISOR') return null
+    return {
+      login: payload.u,
+      nome: typeof payload.n === 'string' && payload.n ? payload.n : payload.u,
+      papel: payload.p,
+    }
   } catch {
     return null
   }

@@ -1,6 +1,6 @@
 // POST /api/auth/login — valida credenciais e cria o cookie de sessão
 import { NextResponse, type NextRequest } from 'next/server'
-import { COOKIE_SESSAO, criarTokenSessao, opcoesCookie, verificarCredenciais } from '@/lib/auth'
+import { COOKIE_SESSAO, autenticar, criarTokenSessao, opcoesCookie } from '@/lib/auth'
 
 // Limite simples de tentativas por IP (memória do processo) contra força bruta
 const LIMITE_TENTATIVAS = 5
@@ -33,7 +33,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ erro: 'Requisição inválida.' }, { status: 400 })
   }
 
-  if (!(await verificarCredenciais(usuario, senha))) {
+  const resultado = await autenticar(usuario, senha)
+  if (!resultado) {
     const n = registro && Date.now() < registro.ate ? registro.n + 1 : 1
     TENTATIVAS.set(ip, { n, ate: Date.now() + JANELA_MS })
     return NextResponse.json({ erro: 'Usuário ou senha incorretos.' }, { status: 401 })
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
 
   // Cookie seguro só quando o acesso é por HTTPS (Caddy envia x-forwarded-proto)
   const https = (req.headers.get('x-forwarded-proto') ?? '').split(',')[0].trim() === 'https'
-  const res = NextResponse.json({ ok: true })
-  res.cookies.set(COOKIE_SESSAO, await criarTokenSessao((usuario || 'admin').trim().toLowerCase()), opcoesCookie(https))
+  const res = NextResponse.json({ ok: true, papel: resultado.papel })
+  res.cookies.set(COOKIE_SESSAO, await criarTokenSessao(resultado), opcoesCookie(https))
   return res
 }

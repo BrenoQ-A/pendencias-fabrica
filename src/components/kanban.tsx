@@ -12,6 +12,8 @@ interface Props {
   aoAbrir: (p: Pendencia) => void
   aoMudarStatus: (id: string, status: StatusPendencia) => Promise<void>
   trocandoId: string | null
+  /** false para SUPERVISOR: esconde as ações rápidas de status */
+  podeEditar: boolean
 }
 
 const COLUNAS: { status: StatusPendencia; titulo: string; anel: string; ponto: string }[] = [
@@ -21,7 +23,7 @@ const COLUNAS: { status: StatusPendencia; titulo: string; anel: string; ponto: s
 ]
 
 /** Quadro de progresso com 3 colunas e ações rápidas em cada card. */
-export function KanbanBoard({ itens, aoAbrir, aoMudarStatus, trocandoId }: Props) {
+export function KanbanBoard({ itens, aoAbrir, aoMudarStatus, trocandoId, podeEditar }: Props) {
   return (
     <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:snap-none sm:grid-cols-3 sm:overflow-visible sm:px-0" role="list" aria-label="Quadro de progresso">
       {COLUNAS.map((col) => {
@@ -63,47 +65,49 @@ export function KanbanBoard({ itens, aoAbrir, aoMudarStatus, trocandoId }: Props
                 daColuna.map((p) => (
                   <div key={p.id} className="relative">
                     <PendenciaCard p={p} aoAbrir={aoAbrir} />
-                    <div className="mt-1 flex gap-1.5 px-0.5">
-                      {p.status !== 'Pendente' && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          disabled={trocandoId === p.id}
-                          onClick={() => aoMudarStatus(p.id, 'Pendente')}
-                          className="h-8 flex-1 gap-1 text-[11px] text-muted-foreground"
-                          aria-label={`Reabrir pendência #${p.numero} como pendente`}
-                        >
-                          <RotateCcw className="h-3 w-3" /> Reabrir
-                        </Button>
-                      )}
-                      {p.status === 'Pendente' && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          disabled={trocandoId === p.id}
-                          onClick={() => aoMudarStatus(p.id, 'Em andamento')}
-                          className="h-8 flex-1 gap-1 text-[11px] text-violet-700 dark:text-violet-400"
-                          aria-label={`Iniciar pendência #${p.numero}`}
-                        >
-                          <PlayCircle className="h-3 w-3" /> Iniciar
-                        </Button>
-                      )}
-                      {p.status !== 'Concluído' && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          disabled={trocandoId === p.id}
-                          onClick={() => aoMudarStatus(p.id, 'Concluído')}
-                          className="h-8 flex-1 gap-1 text-[11px] text-emerald-700 dark:text-emerald-400"
-                          aria-label={`Concluir pendência #${p.numero}`}
-                        >
-                          <CheckCircle2 className="h-3 w-3" /> Concluir
-                        </Button>
-                      )}
-                    </div>
+                    {podeEditar && (
+                      <div className="mt-1 flex gap-1.5 px-0.5">
+                        {p.status !== 'Pendente' && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            disabled={trocandoId === p.id}
+                            onClick={() => aoMudarStatus(p.id, 'Pendente')}
+                            className="h-8 flex-1 gap-1 text-[11px] text-muted-foreground"
+                            aria-label={`Reabrir pendência #${p.numero} como pendente`}
+                          >
+                            <RotateCcw className="h-3 w-3" /> Reabrir
+                          </Button>
+                        )}
+                        {p.status === 'Pendente' && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            disabled={trocandoId === p.id}
+                            onClick={() => aoMudarStatus(p.id, 'Em andamento')}
+                            className="h-8 flex-1 gap-1 text-[11px] text-violet-700 dark:text-violet-400"
+                            aria-label={`Iniciar pendência #${p.numero}`}
+                          >
+                            <PlayCircle className="h-3 w-3" /> Iniciar
+                          </Button>
+                        )}
+                        {p.status !== 'Concluído' && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            disabled={trocandoId === p.id}
+                            onClick={() => aoMudarStatus(p.id, 'Concluído')}
+                            className="h-8 flex-1 gap-1 text-[11px] text-emerald-700 dark:text-emerald-400"
+                            aria-label={`Concluir pendência #${p.numero}`}
+                          >
+                            <CheckCircle2 className="h-3 w-3" /> Concluir
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))
               )}

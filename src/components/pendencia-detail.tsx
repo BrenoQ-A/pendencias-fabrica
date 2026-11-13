@@ -3,11 +3,13 @@
 import { useState } from 'react'
 import {
   Briefcase,
+  Building2,
   CalendarDays,
   CalendarClock,
   CheckCircle2,
   ClipboardList,
   FileText,
+  Hash,
   History,
   ImageOff,
   Loader2,
@@ -40,6 +42,8 @@ import type { Pendencia, StatusPendencia } from '@/lib/app-types'
 
 interface Props {
   pendencia: Pendencia | null
+  /** false para SUPERVISOR: só leitura (sem editar, excluir ou mudar status) */
+  podeEditar: boolean
   aoFechar: () => void
   aoMudarStatus: (id: string, status: StatusPendencia, comentario?: string) => Promise<void>
   aoEditar: (p: Pendencia) => void
@@ -61,7 +65,7 @@ function Linha({ icone: Icone, rotulo, valor }: { icone: React.ElementType; rotu
 }
 
 /** Painel de detalhe: fotos + progresso + histórico + ações. */
-export function PendenciaDetail({ pendencia: p, aoFechar, aoMudarStatus, aoEditar, aoExcluir }: Props) {
+export function PendenciaDetail({ pendencia: p, podeEditar, aoFechar, aoMudarStatus, aoEditar, aoExcluir }: Props) {
   const { toast } = useToast()
   const [lightbox, setLightbox] = useState<number | null>(null)
   const [comentario, setComentario] = useState('')
@@ -181,55 +185,57 @@ export function PendenciaDetail({ pendencia: p, aoFechar, aoMudarStatus, aoEdita
               </p>
             )}
 
-            {/* Ações de status */}
-            <div className="mt-3 rounded-lg border bg-muted/40 p-3">
-              <label htmlFor="comentario-status" className="text-xs font-medium text-muted-foreground">
-                Comentário (opcional, fica no histórico)
-              </label>
-              <Input
-                id="comentario-status"
-                value={comentario}
-                onChange={(e) => setComentario(e.target.value)}
-                placeholder="Ex.: peça encomendada, aguardando chegada…"
-                className="mt-1 h-9"
-              />
-              <div className="mt-2 flex flex-wrap gap-2">
-                {p.status !== 'Pendente' && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={trocando !== null}
-                    onClick={() => mudarStatus('Pendente')}
-                    className="h-9 min-h-9"
-                  >
-                    {trocando === 'Pendente' ? <Loader2 className="h-4 w-4 animate-spin" /> : '↩'} Reabrir (Pendente)
-                  </Button>
-                )}
-                {p.status !== 'Em andamento' && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled={trocando !== null}
-                    onClick={() => mudarStatus('Em andamento')}
-                    className="h-9 min-h-9 bg-violet-600 text-white hover:bg-violet-700"
-                  >
-                    {trocando === 'Em andamento' ? <Loader2 className="h-4 w-4 animate-spin" /> : '▶'} Iniciar / Em andamento
-                  </Button>
-                )}
-                {p.status !== 'Concluído' && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled={trocando !== null}
-                    onClick={() => mudarStatus('Concluído')}
-                    className="h-9 min-h-9 bg-emerald-600 text-white hover:bg-emerald-700"
-                  >
-                    {trocando === 'Concluído' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Concluir
-                  </Button>
-                )}
+            {/* Ações de status — só para quem edita */}
+            {podeEditar && (
+              <div className="mt-3 rounded-lg border bg-muted/40 p-3">
+                <label htmlFor="comentario-status" className="text-xs font-medium text-muted-foreground">
+                  Comentário (opcional, fica no histórico)
+                </label>
+                <Input
+                  id="comentario-status"
+                  value={comentario}
+                  onChange={(e) => setComentario(e.target.value)}
+                  placeholder="Ex.: peça encomendada, aguardando chegada…"
+                  className="mt-1 h-9"
+                />
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {p.status !== 'Pendente' && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={trocando !== null}
+                      onClick={() => mudarStatus('Pendente')}
+                      className="h-9 min-h-9"
+                    >
+                      {trocando === 'Pendente' ? <Loader2 className="h-4 w-4 animate-spin" /> : '↩'} Reabrir (Pendente)
+                    </Button>
+                  )}
+                  {p.status !== 'Em andamento' && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={trocando !== null}
+                      onClick={() => mudarStatus('Em andamento')}
+                      className="h-9 min-h-9 bg-violet-600 text-white hover:bg-violet-700"
+                    >
+                      {trocando === 'Em andamento' ? <Loader2 className="h-4 w-4 animate-spin" /> : '▶'} Iniciar / Em andamento
+                    </Button>
+                  )}
+                  {p.status !== 'Concluído' && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={trocando !== null}
+                      onClick={() => mudarStatus('Concluído')}
+                      className="h-9 min-h-9 bg-emerald-600 text-white hover:bg-emerald-700"
+                    >
+                      {trocando === 'Concluído' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Concluir
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </section>
 
           {/* ===== Dados ===== */}
@@ -246,7 +252,9 @@ export function PendenciaDetail({ pendencia: p, aoFechar, aoMudarStatus, aoEdita
               />
               <Linha icone={ClipboardList} rotulo="Solução necessária" valor={p.solucao} />
               <Linha icone={Briefcase} rotulo="Ação - Facilities" valor={p.acao} />
-              <Linha icone={ReceiptText} rotulo="Nota / OS" valor={p.nota} />
+              <Linha icone={ReceiptText} rotulo="Nota" valor={p.nota} />
+              <Linha icone={Hash} rotulo="Ordem (OS)" valor={p.ordem} />
+              <Linha icone={Building2} rotulo="Local de instalação" valor={p.localInstalacao} />
               <Linha icone={FileText} rotulo="Registrado por" valor={p.registradoPor} />
             </div>
             {p.detalhe && (
@@ -291,20 +299,22 @@ export function PendenciaDetail({ pendencia: p, aoFechar, aoMudarStatus, aoEdita
           </section>
         </div>
 
-        {/* Rodapé com ações */}
-        <div className="sticky bottom-0 flex gap-2 border-t bg-background/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
-          <Button type="button" variant="outline" className="h-10 flex-1" onClick={() => aoEditar(p)}>
-            <Pencil className="h-4 w-4" /> Editar
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="h-10 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950"
-            onClick={() => setConfirmarExclusao(true)}
-          >
-            <Trash2 className="h-4 w-4" /> Excluir
-          </Button>
-        </div>
+        {/* Rodapé com ações — só para quem edita */}
+        {podeEditar && (
+          <div className="sticky bottom-0 flex gap-2 border-t bg-background/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+            <Button type="button" variant="outline" className="h-10 flex-1" onClick={() => aoEditar(p)}>
+              <Pencil className="h-4 w-4" /> Editar
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950"
+              onClick={() => setConfirmarExclusao(true)}
+            >
+              <Trash2 className="h-4 w-4" /> Excluir
+            </Button>
+          </div>
+        )}
       </SheetContent>
 
       {lightbox !== null && p.fotos.length > 0 && (

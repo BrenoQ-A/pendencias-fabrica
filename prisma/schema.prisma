@@ -26,13 +26,35 @@ model Pendencia {
   dataRegistro  DateTime        @default(now())
   dataLimite    DateTime?
   resolvidoEm   DateTime?
-  nota          String? // Nota / OS
+  nota          String? // nº da nota fiscal — importação SAP
+  ordem         String? // nº da ordem de serviço (OS) — importação SAP
+  localInstalacao String? // local de instalação da nota/OS — importação SAP
+  notaOriginal  String? // texto original do campo "Nota / OS" antes da separação
   registradoPor String? // nome de quem registrou
   origem        String          @default("App") // App | Planilha
   fotos         Foto[]
   historico     HistoricoItem[]
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
+}
+
+// Usuários com perfil: ADMIN edita · SUPERVISOR só vê
+// (etapa 1 do plano). Enquanto a tabela estiver vazia, o login de
+// emergência continua sendo APP_USUARIO/APP_SENHA do .env como ADMIN.
+model Usuario {
+  id        String   @id @default(cuid())
+  login     String   @unique
+  nome      String?
+  papel     String   @default("SUPERVISOR") // ADMIN | SUPERVISOR
+  senhaHash String // pbkdf2$<iterações>$<sal hex>$<chave hex>
+  criadoEm  DateTime @default(now())
+}
+
+// Contador atômico da numeração de pendências: troca o "maior número + 1",
+// que colide quando dois registros são criados ao mesmo tempo.
+model Contador {
+  chave String @id // ex.: "Pendencia"
+  valor Int
 }
 
 model Foto {
