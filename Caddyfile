@@ -1,23 +1,10 @@
-:81 {
-	@transform_port_query {
-		query XTransformPort=*
-	}
+# Pendências da Fábrica — PHP
+# Este Caddyfile é usado pelo docker-compose (modo container).
+# Para VPS sem Docker, veja o bloco de exemplo no README.md.
 
-	handle @transform_port_query {
-		reverse_proxy localhost:{query.XTransformPort} {
-			header_up Host {host}
-			header_up X-Forwarded-For {remote_host}
-			header_up X-Forwarded-Proto {scheme}
-			header_up X-Real-IP {remote_host}
-		}
-	}
-
-	handle {
-		reverse_proxy localhost:3000 {
-			header_up Host {host}
-			header_up X-Forwarded-For {remote_host}
-			header_up X-Forwarded-Proto {scheme}
-			header_up X-Real-IP {remote_host}
-		}
-	}
+:80 {
+	root * /var/www/html/public
+	encode gzip
+	php_fastcgi php:9000
+	file_server
 }
