@@ -228,5 +228,84 @@ docker compose start app
 |---|---|---|---|
 | **VPS + Docker (recomendada)** | R$ 15–30 | acesso de qualquer lugar, HTTPS grátis, dados num volume fácil de backup, sem limites de uso | você administra o servidor (≈1 h/mês) |
 | Servidor/mini PC na fábrica | R$ 0 | dados 100% internos | exige rede com IP fixo/regra de acesso externo; queda de energia/fibra para o acesso remoto |
-| Vercel + Turso/Neon | R$ 0 (tier free) | deploy em 1 clique, sem servidor | exige migrar SQLite+base64 para banco em nuvem (refactor de armazenamento); fotos limitadas pelo plano |
+| Vercel + Turso | R$ 0 (tier free) | deploy em 1 clique, sem servidor, já suportado pelo código (`TURSO_*`) | dados e fotos ficam em banco de nuvem (Turso); limites do plano gratuito |
 | Railway/Fly.io | US$ 5+ | PaaS com volume persistente | cobrança em dólar; menor previsibilidade de custo |
+
+---
+
+## 9. Publicando na Vercel (com Turso) — alternativa sem servidor
+
+O app também roda na Vercel no plano gratuito. Nesse modo o banco fica no
+**Turso** (SQLite gerenciado na nuvem): o arquivo SQLite local (`file:`)
+**não funciona na Vercel**, porque o sistema de arquivos das funções
+serverless não é persistente. O código já tem suporte: com
+`TURSO_DATABASE_URL` e `TURSO_AUTH_TOKEN` definidos, o app usa o banco remoto
+automaticamente (`src/lib/db.ts`).
+
+### 9.1 Criar o banco no Turso
+
+```bash
+curl -sSfL https://get.tur.so/install.sh | bash   # instala a CLI do Turso
+turso auth login
+turso db create pendencias
+turso db show pendencias --url                    # URL: libsql://pendencias-SEUUSER.turso.io
+turso db tokens create pendencias                 # token do banco (guarde)
+```
+
+### 9.2 Criar as tabelas no Turso (uma vez)
+
+Na Vercel não há script de bootstrap (quem cria as tabelas no Docker é o
+`docker-entrypoint.sh`). Aplique o schema uma vez, de dentro da pasta do
+projeto:
+
+```bash
+npx prisma migrate diff --from-empty \
+  --to-schema-datamodel prisma/schema.prisma --script > /tmp/bootstrap.sql
+turso db shell pendencias < /tmp/bootstrap.sql
+```
+
+### 9.3 Ligar o repositório à Vercel (o deploy deve partir do seu usuário)
+
+O repositório é **privado**, então o app da Vercel precisa ter acesso a ele
+na sua conta GitHub. Se o deploy falhar "porque não partiu do seu usuário",
+confira estes três pontos, nesta ordem:
+
+1. **Login da Vercel**: em vercel.com, entre com a conta GitHub **BrenoQ-A**
+   (Continuar com GitHub). Se sua Vercel estiver ligada a outro usuário do
+   GitHub, o repositório não aparece para importar.
+2. **App da Vercel no GitHub**: Vercel → *Team Settings* → *Git
+   Integrations* → GitHub → *Configure* → instale o app na conta **BrenoQ-A**
+   com acesso a "All repositories" (ou selecionando `pendencias-fabrica`).
+3. **Autoria dos commits**: commits feitos por um usuário do GitHub diferente
+   do seu podem pedir aprovação manual no dashboard. Neste projeto os commits
+   já estão na identidade `BrenoQ-A` — se aparecerem como outro autor, force
+   um novo push para o Vercel reprocessar.
+
+Depois: *Add New → Project → Import Git Repository* → selecione
+`pendencias-fabrica` → **Deploy**.
+
+### 9.4 Variáveis de ambiente na Vercel
+
+No projeto → *Settings → Environment Variables* (todas no ambiente
+*Production*):
+
+| Variável | Exemplo | Para quê |
+|---|---|---|
+| `TURSO_DATABASE_URL` | `libsql://pendencias-SEUUSER.turso.io` | endereço do banco |
+| `TURSO_AUTH_TOKEN` | `eyJ...` | token do banco criado em 9.1 |
+| `APP_USUARIO` | `admin` | usuário da tela de login |
+| `APP_SENHA` | senha forte | senha de acesso — troque o padrão |
+| `AUTH_SECRET` | `openssl rand -hex 32` | assina o cookie de sessão |
+| `SESSAO_DIAS` | `7` | duração da sessão em dias |
+
+### 9.5 Limitações na Vercel
+
+- **Backups**: não há volume para o `scripts/backup.sh`. Faça backup com
+  `turso db export pendencias > backup.sql` (ou snapshots da plataforma) e
+  guarde uma cópia fora da nuvem.
+- **Fotos**: ficam como texto (base64) dentro do banco — contam contra o
+  limite de armazenamento do plano Turso; comprimir mais as fotos reduz o
+  consumo (`src/lib/compress.ts`).
+- **Limite de tentativas de login** (5 por IP/3 min) é por instância — em
+  serverless a contagem pode reciclar entre requisições. Para uso interno,
+  o risco é baixo; se precisar de mais rigor, mova para VPS + Docker.
