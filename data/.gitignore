@@ -1,0 +1,4 @@
+# Banco e dados de runtime — nunca versionados
+pendencias.db*
+tentativas.json
+backups/

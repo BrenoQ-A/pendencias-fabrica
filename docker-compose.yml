@@ -1,40 +1,34 @@
+# Pendências da Fábrica — Caddy (proxy/TLS) + PHP-FPM (aplicação)
+#
+# Primeiro uso:
+#   docker compose up -d --build
+#   docker compose exec php php cli/migrar.php
+#   docker compose exec php php cli/criar-usuario.php --login admin --senha '...' --papel ADMIN
+#
+# O banco SQLite vive no volume "dados" — sobrevive a rebuilds.
+# Para domínio/TLS em produção, troque ":80" no Caddyfile pelo seu domínio
+# (o Caddy emite certificado automaticamente).
+
 services:
-  app:
+  php:
     build: .
-    container_name: pendencias-app
+    restart: unless-stopped
+    volumes:
+      - dados:/var/www/html/data
+
+  caddy:
+    image: caddy:2
     restart: unless-stopped
     ports:
-      - "3000:3000"
-    environment:
-      - DATABASE_URL=file:/data/custom.db
-      # ---- Login de acesso ----
-      # Troque a senha antes de publicar! (usada na tela de login do app)
-      - APP_USUARIO=${APP_USUARIO:-admin}
-      - APP_SENHA=${APP_SENHA:-fabrica2026}
-      # Segredo que assina o cookie de sessão — gere um com: openssl rand -hex 32
-      - AUTH_SECRET=${AUTH_SECRET:-}
+      - "80:80"
+      - "443:443"
     volumes:
-      - pendencias-data:/data
-
-  # ---------- HTTPS automático (opcional, recomendado) ----------
-  # Descomente após apontar o DNS do domínio para o servidor
-  # e criar o arquivo Caddyfile ao lado deste compose.
-  #
-  # caddy:
-  #   image: caddy:2-alpine
-  #   container_name: pendencias-caddy
-  #   restart: unless-stopped
-  #   depends_on:
-  #     - app
-  #   ports:
-  #     - "80:80"
-  #     - "443:443"
-  #   volumes:
-  #     - ./Caddyfile.prod:/etc/caddy/Caddyfile:ro
-  #     - caddy-data:/data
-  #     - caddy-config:/config
+      - ./:/var/www/html:ro
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
 
 volumes:
-  pendencias-data:
-  # caddy-data:
-  # caddy-config:
+  dados:
+  caddy_data:
+  caddy_config:
