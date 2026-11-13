@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, LayoutGrid, List, Plus, RefreshCcw, SquareStack } from 'lucide-react'
+import { Download, LayoutGrid, List, LogOut, Plus, RefreshCcw, SquareStack } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/hooks/use-toast'
@@ -31,10 +31,16 @@ export default function Pagina() {
   const [editando, setEditando] = useState<Pendencia | null>(null)
   const [trocandoId, setTrocandoId] = useState<string | null>(null)
   const [lightboxGaleria, setLightboxGaleria] = useState<{ fotos: { id: string; thumbUrl: string; nome?: string | null }[]; indice: number; legenda: string } | null>(null)
+  const [usuarioLogado, setUsuarioLogado] = useState<string | null>(null)
 
   const carregar = useCallback(async () => {
     try {
       const res = await fetch('/api/pendencias')
+      if (res.status === 401) {
+        // sessão expirada: volta para o login
+        window.location.href = '/login'
+        return
+      }
       if (!res.ok) throw new Error('falha')
       setItens(await res.json())
     } catch {
@@ -46,7 +52,20 @@ export default function Pagina() {
 
   useEffect(() => {
     carregar()
+    fetch('/api/auth/session')
+      .then((r) => r.json())
+      .then((s) => setUsuarioLogado(s?.usuario ?? null))
+      .catch(() => {})
   }, [carregar])
+
+  const sair = useCallback(async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+    } catch {
+      // mesmo sem resposta, segue para o login
+    }
+    window.location.href = '/login'
+  }, [])
 
   const locaisExistentes = useMemo(() => [...new Set(itens.map((p) => p.local))], [itens])
   const responsaveisExistentes = useMemo(() => [...new Set(itens.map((p) => p.responsavel))], [itens])
@@ -151,6 +170,21 @@ export default function Pagina() {
             <p className="hidden text-xs text-muted-foreground sm:block">Registro e acompanhamento de problemas · MVP</p>
           </div>
           <ThemeToggle />
+          {usuarioLogado && (
+            <span className="hidden shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground lg:inline">
+              {usuarioLogado}
+            </span>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 shrink-0 gap-1.5"
+            onClick={sair}
+            aria-label="Sair do app"
+          >
+            <LogOut className="h-4 w-4" />
+            <span className="hidden md:inline">Sair</span>
+          </Button>
           <Button
             variant="outline"
             size="sm"

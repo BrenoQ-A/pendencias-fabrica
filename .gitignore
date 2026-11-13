@@ -52,3 +52,9 @@ prompt
 server.log
 # Skills directory
 /skills/
+# banco SQLite local
+/db/
+/prisma/db/
+
+# exemplo de env pode ir pro git
+!.env.example

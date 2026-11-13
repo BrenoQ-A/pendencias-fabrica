@@ -7,6 +7,12 @@ services:
       - "3000:3000"
     environment:
       - DATABASE_URL=file:/data/custom.db
+      # ---- Login de acesso ----
+      # Troque a senha antes de publicar! (usada na tela de login do app)
+      - APP_USUARIO=${APP_USUARIO:-admin}
+      - APP_SENHA=${APP_SENHA:-fabrica2026}
+      # Segredo que assina o cookie de sessão — gere um com: openssl rand -hex 32
+      - AUTH_SECRET=${AUTH_SECRET:-}
     volumes:
       - pendencias-data:/data
 

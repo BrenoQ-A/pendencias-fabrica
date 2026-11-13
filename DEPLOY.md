@@ -87,7 +87,45 @@ docker compose logs -f app        # veja o log até "Ready" (Ctrl+C para sair)
 O banco SQLite é criado automaticamente no primeiro boot
 (entrada do app em `http://IP_DA_VPS:3000`).
 
-### 3.4 Habilitar HTTPS (opcional, recomendado)
+### 3.4 Configurar o login de acesso
+
+O app só abre depois do login (as pendências, fotos e histórico ficam
+protegidos — inclusive as APIs). As credenciais são definidas por variáveis
+de ambiente no `docker-compose.yml`:
+
+| Variável | Padrão | Para quê |
+|---|---|---|
+| `APP_USUARIO` | `admin` | nome de usuário na tela de login |
+| `APP_SENHA` | `fabrica2026` | senha de acesso — **troque antes de publicar** |
+| `AUTH_SECRET` | *(padrão interno)* | segredo que assina o cookie de sessão |
+| `SESSAO_DIAS` | `7` | quantos dias o login dura sem repetir a senha |
+
+Para definir seus valores, crie um arquivo `.env` ao lado do
+`docker-compose.yml` (o compose lê automaticamente):
+
+```bash
+cd /opt/pendencias
+cat > .env <<'EOF'
+APP_USUARIO=admin
+APP_SENHA=uma-senha-forte-da-equipe
+AUTH_SECRET=TROQUE_POR_UM_VALOR_ALEATORIO
+EOF
+
+# gere o AUTH_SECRET com:
+openssl rand -hex 32
+
+docker compose up -d   # recria o container aplicando o novo .env
+```
+
+> Como funciona: a sessão é um cookie `HttpOnly` assinado com HMAC-SHA256
+> e expira em `SESSAO_DIAS` dias. Depois de trocar `APP_SENHA`, os
+> usuários já logados continuam na sessão até ela expirar (ou até você
+> reiniciar com um `AUTH_SECRET` novo, que desloga todos). Tentativas de
+> login erradas são limitadas a 5 a cada 3 minutos por IP.
+> O usuário/senha podem ser compartilhados pela equipe — é um acesso único,
+> simples e adequado para uso interno.
+
+### 3.5 Habilitar HTTPS (opcional, recomendado)
 
 1. No provedor de DNS, crie o registro **A**: `pendencias.suaempresa.com.br` → IP da VPS.
 2. Na VPS:
@@ -103,7 +141,7 @@ docker compose up -d              # sobe o Caddy
 O Caddy emite e renova o certificado HTTPS sozinho. A partir daí, use
 somente `https://pendencias.suaempresa.com.br`.
 
-### 3.5 Agendar backup diário
+### 3.6 Agendar backup diário
 
 ```bash
 crontab -e
@@ -175,6 +213,7 @@ docker compose start app
 
 ## 7. Checklist de segurança
 
+- [ ] `APP_SENHA` trocada do padrão (`fabrica2026`) e `AUTH_SECRET` definido com `openssl rand -hex 32`
 - [ ] SSH só com chave (desabilitar senha: `PasswordAuthentication no`)
 - [ ] Firewall: liberar apenas 22, 80 e 443 (`ufw allow 22,80,443/tcp`)
 - [ ] Acessar sempre pelo domínio com HTTPS (com o Caddy ativo, fechar a porta 3000 externa removendo `ports: "3000:3000"` e usando `expose`)
