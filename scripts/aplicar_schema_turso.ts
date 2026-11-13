@@ -1,5 +1,7 @@
-// Aplica o schema SQL no banco Turso e verifica as tabelas criadas.
-// Uso: bun scripts/aplicar_schema_turso.ts  (lê TURSO_* do .env automaticamente)
+// Aplica um arquivo SQL no banco Turso e verifica as tabelas.
+// Uso: bun scripts/aplicar_schema_turso.ts <arquivo.sql>
+// Sem argumento, usa /tmp/schema_turso.sql (comportamento antigo).
+// Exemplo: bun scripts/aplicar_schema_turso.ts prisma/migrations/20261113150000_etapa1_usuarios_nota_contador/migration.sql
 import { createClient } from '@libsql/client'
 import { readFileSync } from 'fs'
 
@@ -10,6 +12,7 @@ if (!url || !token) {
   process.exit(1)
 }
 
+const caminhoSql = process.argv[2] ?? '/tmp/schema_turso.sql'
 const db = createClient({ url, authToken: token })
 
 async function main() {
@@ -18,9 +21,9 @@ async function main() {
   console.log('✓ Conectado ao Turso — ping:', ping.rows[0].ok)
 
   // 2. Schema
-  const sql = readFileSync('/tmp/schema_turso.sql', 'utf-8')
+  const sql = readFileSync(caminhoSql, 'utf-8')
   await db.executeMultiple(sql)
-  console.log('✓ Schema aplicado (executeMultiple)')
+  console.log(`✓ SQL aplicado (${caminhoSql})`)
 
   // 3. Tabelas criadas
   const tabs = await db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'libsql_%' AND name NOT LIKE '_cf_%' ORDER BY name")

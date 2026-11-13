@@ -6,5 +6,10 @@ import { COOKIE_SESSAO, verificarTokenSessao } from '@/lib/auth'
 export async function GET() {
   const armazen = await cookies()
   const sessao = await verificarTokenSessao(armazen.get(COOKIE_SESSAO)?.value)
-  return NextResponse.json({ autenticado: !!sessao, usuario: sessao?.usuario ?? null })
+  return NextResponse.json({
+    autenticado: !!sessao,
+    usuario: sessao?.login ?? null,
+    nome: sessao?.nome ?? null,
+    papel: sessao?.papel ?? null,
+  })
 }

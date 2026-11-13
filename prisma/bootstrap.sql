@@ -14,6 +14,9 @@ CREATE TABLE "Pendencia" (
     "dataLimite" DATETIME,
     "resolvidoEm" DATETIME,
     "nota" TEXT,
+    "ordem" TEXT,
+    "localInstalacao" TEXT,
+    "notaOriginal" TEXT,
     "registradoPor" TEXT,
     "origem" TEXT NOT NULL DEFAULT 'App',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -44,4 +47,23 @@ CREATE TABLE "HistoricoItem" (
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Pendencia_numero_key" ON "Pendencia"("numero");
+
+-- CreateTable
+CREATE TABLE "Usuario" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "login" TEXT NOT NULL,
+    "nome" TEXT,
+    "papel" TEXT NOT NULL DEFAULT 'SUPERVISOR',
+    "senhaHash" TEXT NOT NULL,
+    "criadoEm" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Usuario_login_key" ON "Usuario"("login");
+
+-- CreateTable
+CREATE TABLE "Contador" (
+    "chave" TEXT NOT NULL PRIMARY KEY,
+    "valor" INTEGER NOT NULL
+);
 
