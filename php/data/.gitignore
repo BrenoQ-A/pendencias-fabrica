@@ -1,0 +1,3 @@
+# Banco e dados de runtime da versão PHP — nunca versionados
+pendencias.db*
+tentativas.json
